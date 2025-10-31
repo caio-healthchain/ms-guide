@@ -1,57 +1,46 @@
-# Build stage
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-COPY tsconfig.json ./
-COPY prisma ./prisma/
-
-# Install dependencies
-RUN npm ci
-
-# Copy source code
-COPY src ./src
-
-# Generate Prisma Client
-RUN npx prisma generate
-
-# Build TypeScript
-RUN npm run build
-
-# Production stage
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Install production dependencies only
-COPY package*.json ./
-RUN npm ci --only=production
+# Instalar dependências necessárias para o Prisma no Alpine Linux
+RUN apk add --no-cache \
+    openssl \
+    openssl-dev \
+    libc6-compat \
+    curl
 
-# Copy Prisma schema and generate client
-COPY prisma ./prisma/
+# Copiar arquivos de dependências
+COPY package*.json ./
+
+# Instalar todas as dependências (incluindo devDependencies para build)
+RUN npm ci
+
+# Copiar código fonte
+COPY . .
+
+# Gerar Prisma Client com engine específico para Alpine
 RUN npx prisma generate
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
+# Build do projeto TypeScript
+RUN npm run build
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+# Remover devDependencies após build
+RUN npm ci --only=production && npm cache clean --force
 
-# Change ownership
+# Criar usuário não-root
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Mudar ownership dos arquivos para o usuário nodejs
 RUN chown -R nodejs:nodejs /app
-
-# Switch to non-root user
 USER nodejs
 
-# Expose port
+# Expor porta
 EXPOSE 3011
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3011/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3011/health || exit 1
 
-# Start application
-CMD ["node", "dist/index.js"]
+# Comando de inicialização
+CMD ["npm", "start"]
