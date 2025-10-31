@@ -6,9 +6,36 @@ import { config } from '../config/config';
 const router = Router();
 
 /**
- * @route GET /health
- * @desc Health check endpoint
- * @access Public
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check geral
+ *     description: Verifica o status geral do serviço e das conexões com bancos de dados
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Serviço saudável
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 service:
+ *                   type: string
+ *                 status:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ *                 uptime:
+ *                   type: number
+ *                 environment:
+ *                   type: string
+ *                 version:
+ *                   type: string
+ *                 databases:
+ *                   type: object
+ *       503:
+ *         description: Serviço degradado
  */
 router.get('/', async (_req: Request, res: Response) => {
   const health = {
@@ -53,9 +80,24 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 /**
- * @route GET /health/ready
- * @desc Readiness probe for Kubernetes
- * @access Public
+ * @swagger
+ * /health/ready:
+ *   get:
+ *     summary: Readiness probe
+ *     description: Verifica se o serviço está pronto para receber requisições (usado pelo Kubernetes)
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Serviço pronto
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *       503:
+ *         description: Serviço não está pronto
  */
 router.get('/ready', async (_req: Request, res: Response) => {
   try {
@@ -67,9 +109,22 @@ router.get('/ready', async (_req: Request, res: Response) => {
 });
 
 /**
- * @route GET /health/live
- * @desc Liveness probe for Kubernetes
- * @access Public
+ * @swagger
+ * /health/live:
+ *   get:
+ *     summary: Liveness probe
+ *     description: Verifica se o serviço está vivo (usado pelo Kubernetes)
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Serviço vivo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
  */
 router.get('/live', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'alive' });
