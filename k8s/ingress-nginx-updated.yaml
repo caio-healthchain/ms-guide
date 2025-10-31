@@ -1,0 +1,93 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: microservices-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      # MS Patients
+      - path: /patients(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: patients-service
+            port:
+              number: 80
+      
+      # MS Procedures
+      - path: /procedures(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: procedures-service
+            port:
+              number: 80
+      
+      # MS Billing
+      - path: /billing(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: billing-service
+            port:
+              number: 80
+      
+      # MS Audit
+      - path: /audit(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: audit-service
+            port:
+              number: 80
+      
+      # MS Hospital Integration
+      - path: /hospital(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: hospital-service
+            port:
+              number: 80
+      
+      # MS AI Agent
+      - path: /aiagent(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: ai-agent-service
+            port:
+              number: 80
+      
+      # MS Rules Engine
+      - path: /rulesengine(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: rulesengine-service
+            port:
+              number: 80
+              
+      # MS XML Importer
+      - path: /xmlimporter(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: xmlimporter-service
+            port:
+              number: 80
+      
+      # MS Guide
+      - path: /guide(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: guide-service
+            port:
+              number: 80

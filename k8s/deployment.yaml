@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-guide
+  labels:
+    app: ms-guide
+spec:
+  replicas: 2 # Número de réplicas para alta disponibilidade
+  selector:
+    matchLabels:
+      app: ms-guide
+  template:
+    metadata:
+      labels:
+        app: ms-guide
+    spec:
+      containers:
+      - name: ms-guide
+        image: lazarusacr.azurecr.io/ms-guide:latest
+        ports:
+        - containerPort: 3011
+        env:
+        - name: PORT
+          value: "3011"
+        - name: NODE_ENV
+          value: "production"
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: lazarus-secrets
+              key: api-key
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: lazarus-secrets
+              key: database-url
+        - name: COSMOSDB_URI
+          valueFrom:
+            secretKeyRef:
+              name: lazarus-secrets
+              key: cosmosdb-uri
+        - name: SERVICE_BUS_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: lazarus-secrets
+              key: service-bus-connection-string
+        - name: USE_COSMOSDB
+          value: "true"
+        - name: USE_SERVICE_BUS
+          value: "false"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 3011
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 3011
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3

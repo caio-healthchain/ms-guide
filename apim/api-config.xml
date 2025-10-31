@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Azure API Management - Configuração para MS-Guide -->
+<api-management>
+  <api>
+    <name>ms-guide-api</name>
+    <display-name>Lazarus Guide API</display-name>
+    <description>API para gerenciamento de guias TISS</description>
+    <service-url>http://guide-service/api/v1</service-url>
+    <path>guides</path>
+    <protocols>
+      <protocol>https</protocol>
+      <protocol>http</protocol>
+    </protocols>
+    
+    <!-- Políticas globais -->
+    <policies>
+      <inbound>
+        <!-- Rate limiting -->
+        <rate-limit calls="1000" renewal-period="60" />
+        
+        <!-- CORS -->
+        <cors allow-credentials="true">
+          <allowed-origins>
+            <origin>*</origin>
+          </allowed-origins>
+          <allowed-methods>
+            <method>GET</method>
+            <method>POST</method>
+            <method>PUT</method>
+            <method>DELETE</method>
+            <method>OPTIONS</method>
+          </allowed-methods>
+          <allowed-headers>
+            <header>*</header>
+          </allowed-headers>
+        </cors>
+        
+        <!-- API Key validation -->
+        <validate-header name="X-API-Key" failed-check-httpcode="401" failed-check-error-message="API Key is required" ignore-case="false" />
+        
+        <!-- Set backend service URL -->
+        <set-backend-service base-url="http://guide-service/api/v1" />
+      </inbound>
+      
+      <backend>
+        <forward-request timeout="30" />
+      </backend>
+      
+      <outbound>
+        <!-- Add response headers -->
+        <set-header name="X-Powered-By" exists-action="override">
+          <value>Lazarus Platform</value>
+        </set-header>
+      </outbound>
+      
+      <on-error>
+        <!-- Error handling -->
+        <set-variable name="errorMessage" value="@(context.LastError.Message)" />
+        <return-response>
+          <set-status code="500" reason="Internal Server Error" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@{
+            return new JObject(
+              new JProperty("success", false),
+              new JProperty("message", context.Variables.GetValueOrDefault<string>("errorMessage")),
+              new JProperty("timestamp", DateTime.UtcNow.ToString("o"))
+            ).ToString();
+          }</set-body>
+        </return-response>
+      </on-error>
+    </policies>
+    
+    <!-- Operações -->
+    <operations>
+      <!-- GET /guides -->
+      <operation>
+        <name>get-guides</name>
+        <display-name>List Guides</display-name>
+        <method>GET</method>
+        <url-template>/guides</url-template>
+        <description>Lista todas as guias com paginação e filtros</description>
+        <request>
+          <query-parameters>
+            <parameter name="limit" type="integer" required="false">
+              <description>Número de itens por página (padrão: 100, máx: 100)</description>
+            </parameter>
+            <parameter name="offset" type="integer" required="false">
+              <description>Número de itens a pular (padrão: 0)</description>
+            </parameter>
+            <parameter name="page" type="integer" required="false">
+              <description>Número da página (padrão: 1)</description>
+            </parameter>
+            <parameter name="search" type="string" required="false">
+              <description>Busca por número da guia, beneficiário ou carteira</description>
+            </parameter>
+            <parameter name="tipoGuia" type="string" required="false">
+              <description>Filtro por tipo de guia</description>
+            </parameter>
+          </query-parameters>
+        </request>
+      </operation>
+      
+      <!-- GET /guides/stats -->
+      <operation>
+        <name>get-guide-stats</name>
+        <display-name>Get Guide Statistics</display-name>
+        <method>GET</method>
+        <url-template>/guides/stats</url-template>
+        <description>Retorna estatísticas das guias</description>
+      </operation>
+      
+      <!-- GET /guides/{id} -->
+      <operation>
+        <name>get-guide-by-id</name>
+        <display-name>Get Guide by ID</display-name>
+        <method>GET</method>
+        <url-template>/guides/{id}</url-template>
+        <description>Busca uma guia por ID</description>
+        <template-parameters>
+          <parameter name="id" type="integer" required="true">
+            <description>ID da guia</description>
+          </parameter>
+        </template-parameters>
+      </operation>
+      
+      <!-- GET /guides/{numeroGuiaPrestador}/procedures -->
+      <operation>
+        <name>get-guide-procedures</name>
+        <display-name>Get Guide Procedures</display-name>
+        <method>GET</method>
+        <url-template>/guides/{numeroGuiaPrestador}/procedures</url-template>
+        <description>Lista procedimentos de uma guia</description>
+        <template-parameters>
+          <parameter name="numeroGuiaPrestador" type="string" required="true">
+            <description>Número da guia do prestador</description>
+          </parameter>
+        </template-parameters>
+        <request>
+          <query-parameters>
+            <parameter name="limit" type="integer" required="false">
+              <description>Número de itens por página (padrão: 200)</description>
+            </parameter>
+            <parameter name="offset" type="integer" required="false">
+              <description>Número de itens a pular (padrão: 0)</description>
+            </parameter>
+          </query-parameters>
+        </request>
+      </operation>
+      
+      <!-- GET /guides/procedures/{procedureId} -->
+      <operation>
+        <name>get-guide-procedure-by-id</name>
+        <display-name>Get Guide Procedure by ID</display-name>
+        <method>GET</method>
+        <url-template>/guides/procedures/{procedureId}</url-template>
+        <description>Busca um procedimento específico por ID</description>
+        <template-parameters>
+          <parameter name="procedureId" type="integer" required="true">
+            <description>ID do procedimento</description>
+          </parameter>
+        </template-parameters>
+      </operation>
+    </operations>
+  </api>
+</api-management>
