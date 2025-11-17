@@ -129,10 +129,17 @@ export class GuideRepository {
       `;
 
       // Mapear para incluir o status no nível raiz do objeto
+      // Mapear status de português para inglês para compatibilidade com frontend
+      const statusMap: Record<string, string> = {
+        'APROVADO': 'APPROVED',
+        'REJEITADO': 'REJECTED',
+        'PENDENTE': 'PENDING'
+      };
+      
       const proceduresWithStatus = (procedures as any[]).map(proc => ({
         ...proc,
         guiaId: String(proc.guiaId),
-        status: proc.auditStatus || 'PENDING',
+        status: statusMap[proc.auditStatus] || 'PENDING',
         auditorId: proc.statusAuditorId,
         observacoes: proc.statusObservacoes,
         statusUpdatedAt: proc.statusUpdatedAt,
