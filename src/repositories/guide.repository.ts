@@ -112,15 +112,33 @@ export class GuideRepository {
         return [];
       }
 
-      // Busca os procedimentos
-      const procedures = await prisma.procedimento.findMany({
-        where: { guiaId: guide.id },
-        take: limit,
-        skip: offset,
-        orderBy: [{ sequencialItem: 'asc' }, { id: 'asc' }],
-      });
+      // Busca os procedimentos com status usando raw SQL para evitar problemas de cache do Prisma
+      const procedures = await prisma.$queryRaw`
+        SELECT 
+          p.*,
+          ps.status as "auditStatus",
+          ps."auditorId" as "statusAuditorId",
+          ps.observacoes as "statusObservacoes",
+          ps."updatedAt" as "statusUpdatedAt"
+        FROM guia_procedimentos p
+        LEFT JOIN procedimento_status ps ON p.id = ps."procedimentoId"
+        WHERE p."guiaId" = ${guide.id}
+        ORDER BY p."sequencialItem" ASC, p.id ASC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `;
 
-      return procedures || [];
+      // Mapear para incluir o status no nível raiz do objeto
+      const proceduresWithStatus = (procedures as any[]).map(proc => ({
+        ...proc,
+        guiaId: String(proc.guiaId),
+        status: proc.auditStatus || 'PENDING',
+        auditorId: proc.statusAuditorId,
+        observacoes: proc.statusObservacoes,
+        statusUpdatedAt: proc.statusUpdatedAt,
+      }));
+
+      return proceduresWithStatus || [];
     } catch (error) {
       logger.error('Failed to fetch guide procedures by numeroGuiaPrestador:', error);
       throw error;

@@ -313,7 +313,7 @@ model Guia {
 }
 
 model Procedimento {
-  id                    Int     @id @default(autoincrement())
+  id                    Int                   @id @default(autoincrement())
   sequencialItem        String
   dataExecucao          String?
   horaInicial           String?
@@ -330,10 +330,23 @@ model Procedimento {
   nomeProfissional      String?
   identEquipe           Json?
   guiaId                Int
-  guia                  Guia    @relation(fields: [guiaId], references: [id], onDelete: Cascade)
-
+  guia                  Guia                  @relation(fields: [guiaId], references: [id], onDelete: Cascade)
+  auditStatus           ProcedimentoStatus?   @relation("ProcedimentoToStatus")
   @@unique([guiaId, sequencialItem])
   @@map("guia_procedimentos")
+}
+
+model ProcedimentoStatus {
+  id              Int          @id @default(autoincrement())
+  guiaId          Int
+  procedimentoId  Int          @unique
+  status          String       // PENDENTE, APROVADO, REJEITADO
+  auditorId       String
+  observacoes     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  procedimento    Procedimento @relation("ProcedimentoToStatus", fields: [procedimentoId], references: [id], onDelete: Cascade)
+  @@map("procedimento_status")
 }
 
 model tussProcedimento {
