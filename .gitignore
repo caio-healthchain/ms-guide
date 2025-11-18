@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
+# package-lock.json - NECESSÁRIO para Docker build
 yarn.lock
 pnpm-lock.yaml
 
