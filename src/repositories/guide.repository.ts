@@ -51,7 +51,45 @@ export class GuideRepository {
         prisma.guia.count({ where }),
       ]);
 
-      return { data: guides, total };
+      // Calcular auditStatus para cada guia baseado nos procedimentos
+      const guidesWithStatus = await Promise.all(
+        guides.map(async (guide) => {
+          // Buscar status dos procedimentos
+          const procedimentosStatus = await prisma.procedimento_status.findMany({
+            where: { guiaId: guide.id },
+            select: { status: true, procedimentoId: true },
+          });
+
+          // Criar mapa de status por procedimentoId
+          const statusMap = new Map(
+            procedimentosStatus.map(ps => [ps.procedimentoId, ps.status])
+          );
+
+          // Verificar se todos os procedimentos têm status definido e nenhum está PENDENTE
+          const totalProcedimentos = guide.guia_procedimentos.length;
+          const procedimentosComStatus = guide.guia_procedimentos.filter(p => 
+            statusMap.has(p.id)
+          ).length;
+          
+          const hasPendente = guide.guia_procedimentos.some(p => {
+            const status = statusMap.get(p.id);
+            return !status || status === 'PENDENTE';
+          });
+
+          // Determinar auditStatus
+          let auditStatus = 'PENDING';
+          if (totalProcedimentos > 0 && procedimentosComStatus === totalProcedimentos && !hasPendente) {
+            auditStatus = 'COMPLETED';
+          }
+
+          return {
+            ...guide,
+            auditStatus,
+          };
+        })
+      );
+
+      return { data: guidesWithStatus, total };
     } catch (error) {
       logger.error('Failed to fetch guides from DB:', error);
       throw error;
