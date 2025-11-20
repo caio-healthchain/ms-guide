@@ -218,4 +218,38 @@ export class GuideRepository {
       throw error;
     }
   }
+
+  /**
+   * Atualiza status e campos relacionados de um procedimento
+   */
+  async updateProcedureStatus(
+    id: number,
+    updateData: {
+      status?: string;
+      valorAprovado?: number;
+      motivoRejeicao?: string;
+      categoriaRejeicao?: string;
+    }
+  ): Promise<any | null> {
+    try {
+      const updatedProcedure = await prisma.procedimento.update({
+        where: { id },
+        data: updateData as any,
+        include: {
+          guia: {
+            select: {
+              numeroGuiaPrestador: true,
+              numeroCarteira: true,
+              tipoGuia: true,
+            },
+          },
+        },
+      });
+
+      return updatedProcedure;
+    } catch (error) {
+      logger.error('Failed to update procedure status:', error);
+      throw error;
+    }
+  }
 }

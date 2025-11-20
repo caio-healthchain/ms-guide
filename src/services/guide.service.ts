@@ -138,4 +138,72 @@ export class GuideService {
       throw new AppError('Failed to retrieve guide statistics', 500);
     }
   }
+
+  /**
+   * Atualiza status de um procedimento com suporte a valorAprovado e justificativa de rejeição
+   */
+  async updateProcedureStatus(
+    id: string,
+    status: string,
+    valorAprovado?: number,
+    motivoRejeicao?: string,
+    categoriaRejeicao?: string
+  ): Promise<any> {
+    try {
+      const intId = parseInt(id, 10);
+      if (Number.isNaN(intId)) {
+        throw new AppError('Invalid procedure ID', 400);
+      }
+
+      // Validar status
+      const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'FINALIZED'];
+      if (!validStatuses.includes(status.toUpperCase())) {
+        throw new AppError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
+      }
+
+      // Validar que rejeições tenham justificativa
+      if (status.toUpperCase() === 'REJECTED' && !motivoRejeicao) {
+        throw new AppError('motivoRejeicao is required when rejecting a procedure', 400);
+      }
+
+      // Preparar dados para atualização
+      const updateData: any = {
+        status: status.toUpperCase(),
+      };
+
+      if (valorAprovado !== undefined) {
+        updateData.valorAprovado = valorAprovado;
+      }
+
+      if (motivoRejeicao) {
+        updateData.motivoRejeicao = motivoRejeicao;
+      }
+
+      if (categoriaRejeicao) {
+        updateData.categoriaRejeicao = categoriaRejeicao;
+      }
+
+      const updatedProcedure = await this.guideRepository.updateProcedureStatus(
+        intId,
+        updateData
+      );
+
+      if (!updatedProcedure) {
+        throw new AppError('Procedure not found', 404);
+      }
+
+      logger.info('Procedure status updated', {
+        procedureId: intId,
+        status,
+        valorAprovado,
+        hasRejeicao: !!motivoRejeicao,
+      });
+
+      return updatedProcedure;
+    } catch (error) {
+      logger.error('Error updating procedure status:', error);
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to update procedure status', 500);
+    }
+  }
 }

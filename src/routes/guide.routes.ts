@@ -143,6 +143,67 @@ router.get('/procedures/:procedureId', apiKeyMiddleware, controller.getGuideProc
 
 /**
  * @swagger
+ * /api/v1/guides/procedures/{id}/status:
+ *   put:
+ *     summary: Atualiza status de um procedimento
+ *     description: Atualiza o status de um procedimento com suporte a ajuste automático de valor e justificativa de rejeição
+ *     tags: [Guides]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do procedimento
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [PENDING, APPROVED, REJECTED, FINALIZED]
+ *                 description: Novo status do procedimento
+ *               valorAprovado:
+ *                 type: number
+ *                 description: Valor após ajuste automático (usado em aprovações)
+ *               motivoRejeicao:
+ *                 type: string
+ *                 description: Justificativa obrigatória para rejeições
+ *               categoriaRejeicao:
+ *                 type: string
+ *                 description: Categoria da rejeição (ex VALOR_DIVERGENTE, FORA_PACOTE)
+ *     responses:
+ *       200:
+ *         description: Status atualizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Dados inválidos ou motivoRejeicao ausente em rejeições
+ *       404:
+ *         description: Procedimento não encontrado
+ *       401:
+ *         description: API Key não fornecida
+ */
+router.put('/procedures/:id/status', apiKeyMiddleware, controller.updateProcedureStatus);
+
+/**
+ * @swagger
  * /api/v1/guides/{numeroGuiaPrestador}/procedures:
  *   get:
  *     summary: Lista procedimentos de uma guia

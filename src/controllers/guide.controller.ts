@@ -119,4 +119,43 @@ export class GuideController {
       timestamp: new Date().toISOString(),
     });
   });
+
+  /**
+   * PUT /api/v1/guides/procedures/:id/status
+   * Atualiza status de um procedimento
+   */
+  updateProcedureStatus = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { status, valorAprovado, motivoRejeicao, categoriaRejeicao } = req.body;
+
+    if (!id) {
+      throw new AppError('Procedure ID is required', 400);
+    }
+
+    if (!status) {
+      throw new AppError('Status is required', 400);
+    }
+
+    logger.info('Updating procedure status', {
+      procedureId: id,
+      status,
+      valorAprovado,
+      hasRejeicao: !!motivoRejeicao,
+    });
+
+    const updatedProcedure = await this.guideService.updateProcedureStatus(
+      id,
+      status,
+      valorAprovado,
+      motivoRejeicao,
+      categoriaRejeicao
+    );
+
+    res.json({
+      success: true,
+      data: updatedProcedure,
+      message: 'Procedure status updated successfully',
+      timestamp: new Date().toISOString(),
+    });
+  });
 }
