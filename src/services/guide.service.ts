@@ -201,7 +201,13 @@ export class GuideService {
 
       // Registrar log de auditoria (chamada assíncrona sem bloquear)
       this.registrarLogAuditoria(updatedProcedure, status.toUpperCase(), valorAprovado, motivoRejeicao, categoriaRejeicao)
-        .catch(err => logger.error('Erro ao registrar log de auditoria:', err));
+        .catch(err => {
+          logger.error('❌ ERRO ao registrar log de auditoria:', {
+            error: err.message || err,
+            stack: err.stack,
+            procedimentoId: updatedProcedure.id
+          });
+        });
 
       return updatedProcedure;
     } catch (error) {
@@ -223,6 +229,12 @@ export class GuideService {
   ): Promise<void> {
     try {
       const msAuditUrl = process.env.MS_AUDIT_URL || 'https://lazarusapi.azure-api.net/audits';
+      
+      logger.info('🔄 Tentando registrar log de auditoria', {
+        msAuditUrl,
+        procedimentoId: procedimento.id,
+        decisao
+      });
       
       const logEntry = {
         guiaId: procedimento.guiaId?.toString() || '',
@@ -249,13 +261,26 @@ export class GuideService {
       });
 
       if (!response.ok) {
-        logger.warn('Falha ao registrar log de auditoria', {
+        const errorText = await response.text();
+        logger.warn('⚠️ Falha ao registrar log de auditoria', {
           status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText,
           procedimentoId: procedimento.id,
+          url: `${msAuditUrl}/api/v1/audit-log`
+        });
+      } else {
+        logger.info('✅ Log de auditoria registrado com sucesso', {
+          procedimentoId: procedimento.id
         });
       }
-    } catch (error) {
-      logger.error('Erro ao chamar ms-audit para registrar log:', error);
+    } catch (error: any) {
+      logger.error('❌ Erro ao chamar ms-audit para registrar log:', {
+        error: error.message || error,
+        stack: error.stack,
+        procedimentoId: procedimento.id,
+        msAuditUrl: process.env.MS_AUDIT_URL || 'https://lazarusapi.azure-api.net/audits'
+      });
       // Não propagar erro para não bloquear a atualização do procedimento
     }
   }
