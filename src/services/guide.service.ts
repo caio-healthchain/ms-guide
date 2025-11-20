@@ -199,11 +199,64 @@ export class GuideService {
         hasRejeicao: !!motivoRejeicao,
       });
 
+      // Registrar log de auditoria (chamada assíncrona sem bloquear)
+      this.registrarLogAuditoria(updatedProcedure, status.toUpperCase(), valorAprovado, motivoRejeicao, categoriaRejeicao)
+        .catch(err => logger.error('Erro ao registrar log de auditoria:', err));
+
       return updatedProcedure;
     } catch (error) {
       logger.error('Error updating procedure status:', error);
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to update procedure status', 500);
+    }
+  }
+
+  /**
+   * Registra log de auditoria no ms-audit
+   */
+  private async registrarLogAuditoria(
+    procedimento: any,
+    decisao: string,
+    valorAprovado?: number,
+    motivoRejeicao?: string,
+    categoriaRejeicao?: string
+  ): Promise<void> {
+    try {
+      const msAuditUrl = process.env.MS_AUDIT_URL || 'https://lazarusapi.azure-api.net/audits';
+      
+      const logEntry = {
+        guiaId: procedimento.guiaId?.toString() || '',
+        guiaNumero: procedimento.numeroGuiaPrestador,
+        procedimentoSequencial: procedimento.sequencialItem,
+        codigoProcedimento: procedimento.codigoProcedimento,
+        descricaoProcedimento: procedimento.descricaoProcedimento,
+        tipoApontamento: categoriaRejeicao || 'VALOR_DIVERGENTE',
+        valorOriginal: Number(procedimento.valorTotal || 0),
+        valorAprovado: valorAprovado || Number(procedimento.valorTotal || 0),
+        economiaValor: valorAprovado 
+          ? Number(procedimento.valorTotal || 0) - valorAprovado
+          : 0,
+        decisao: decisao === 'APPROVED' ? 'APROVADO' : decisao === 'REJECTED' ? 'REJEITADO' : 'PARCIALMENTE_APROVADO',
+        auditorObservacoes: motivoRejeicao,
+      };
+
+      const response = await fetch(`${msAuditUrl}/api/v1/audit-log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(logEntry),
+      });
+
+      if (!response.ok) {
+        logger.warn('Falha ao registrar log de auditoria', {
+          status: response.status,
+          procedimentoId: procedimento.id,
+        });
+      }
+    } catch (error) {
+      logger.error('Erro ao chamar ms-audit para registrar log:', error);
+      // Não propagar erro para não bloquear a atualização do procedimento
     }
   }
 }
