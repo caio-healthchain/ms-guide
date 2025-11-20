@@ -37,7 +37,7 @@ export class GuideRepository {
           skip: offset,
           orderBy: { createdAt: 'desc' },
           include: {
-            procedimentos: {
+            guia_procedimentos: {
               select: {
                 id: true,
                 sequencialItem: true,
@@ -66,7 +66,7 @@ export class GuideRepository {
       const guide = await prisma.guia.findUnique({
         where: { id },
         include: {
-          procedimentos: true,
+          guia_procedimentos: true,
         },
       });
 
@@ -85,7 +85,7 @@ export class GuideRepository {
       const guide = await prisma.guia.findUnique({
         where: { numeroGuiaPrestador },
         include: {
-          procedimentos: true,
+          guia_procedimentos: true,
         },
       });
 
@@ -157,7 +157,7 @@ export class GuideRepository {
    */
   async findProcedureById(id: number): Promise<any | null> {
     try {
-      const procedure = await prisma.procedimento.findUnique({
+      const procedure = await prisma.guia_procedimentos.findUnique({
         where: { id },
         include: {
           guia: {
@@ -232,9 +232,32 @@ export class GuideRepository {
     }
   ): Promise<any | null> {
     try {
-      const updatedProcedure = await prisma.procedimento.update({
+      // Atualizar campos valorAprovado, motivoRejeicao, categoriaRejeicao na tabela procedimento
+      const procedimentoData: any = {};
+      if (updateData.valorAprovado !== undefined) {
+        procedimentoData.valorAprovado = updateData.valorAprovado;
+      }
+      if (updateData.motivoRejeicao !== undefined) {
+        procedimentoData.motivoRejeicao = updateData.motivoRejeicao;
+      }
+      if (updateData.categoriaRejeicao !== undefined) {
+        procedimentoData.categoriaRejeicao = updateData.categoriaRejeicao;
+      }
+
+      // Buscar procedimento para obter guiaId
+      const procedimento = await prisma.guia_procedimentos.findUnique({
         where: { id },
-        data: updateData as any,
+        select: { guiaId: true },
+      });
+
+      if (!procedimento) {
+        throw new Error(`Procedimento ${id} não encontrado`);
+      }
+
+      // Atualizar procedimento com novos campos
+      const updatedProcedure = await prisma.guia_procedimentos.update({
+        where: { id },
+        data: procedimentoData,
         include: {
           guia: {
             select: {
@@ -245,6 +268,36 @@ export class GuideRepository {
           },
         },
       });
+
+      // Atualizar ou criar status na tabela procedimento_status
+      if (updateData.status) {
+        // Converter status de inglês para português (banco usa enum em PT)
+        const statusMap: Record<string, string> = {
+          'APPROVED': 'APROVADO',
+          'REJECTED': 'REJEITADO',
+          'PENDING': 'PENDENTE'
+        };
+        const statusPT = statusMap[updateData.status] || updateData.status;
+
+        await prisma.procedimento_status.upsert({
+          where: {
+            guiaId_procedimentoId: {
+              guiaId: procedimento.guiaId,
+              procedimentoId: id,
+            },
+          },
+          update: {
+            status: statusPT as any,
+            updatedAt: new Date(),
+          },
+          create: {
+            procedimentoId: id,
+            guiaId: procedimento.guiaId,
+            status: statusPT as any,
+            auditorId: 'SYSTEM', // Auditor padrão para aprovações automáticas
+          },
+        });
+      }
 
       return updatedProcedure;
     } catch (error) {

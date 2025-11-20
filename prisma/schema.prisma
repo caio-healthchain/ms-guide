@@ -8,10 +8,393 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Patient {
-  id                   String              @id @default(cuid())
+model ai_agents {
+  id          String   @id
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  name        String
+  description String?
+  type        String
+  config      Json
+  model       String
+  version     String   @default("1.0")
+  isActive    Boolean  @default(true)
+  isTraining  Boolean  @default(false)
+  tags        String[]
+
+  @@index([isActive])
+  @@index([type])
+}
+
+model audit_logs {
+  id               String            @id
+  createdAt        DateTime          @default(now())
+  entityId         String
+  userId           String
+  userName         String
+  userRole         String
+  patientId        String?
+  procedureId      String?
+  newValues        Json?
+  oldValues        Json?
+  billingAccountId String?
+  changes          Json?
+  ipAddress        String?
+  sessionId        String?
+  userAgent        String?
+  entity           AuditLogEntity
+  action           AuditLogAction
+  billing_accounts billing_accounts? @relation(fields: [billingAccountId], references: [id])
+  patients         patients?         @relation(fields: [patientId], references: [id])
+  procedures       procedures?       @relation(fields: [procedureId], references: [id])
+
+  @@index([action])
+  @@index([createdAt])
+  @@index([entityId])
+  @@index([entity])
+  @@index([patientId])
+  @@index([userId])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model auditoria_validacoes {
+  id              String          @id
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  guiaId          Int
+  procedimentoId  Int
+  tipoValidacao   TipoValidacao
+  status          StatusValidacao
+  mensagem        String?
+  valorEsperado   Decimal?        @db.Decimal(10, 2)
+  valorEncontrado Decimal?        @db.Decimal(10, 2)
+  diferenca       Decimal?        @db.Decimal(10, 2)
+  metadata        Json?
+  auditorId       String?
+  dataValidacao   DateTime?
+  observacoes     String?
+
+  @@unique([guiaId, procedimentoId, tipoValidacao], map: "auditoria_validacoes_unique_idx")
+  @@index([guiaId])
+  @@index([procedimentoId])
+  @@index([status])
+  @@index([tipoValidacao])
+}
+
+model billing_accounts {
+  id              String          @id
+  patientId       String
+  accountNumber   String          @unique
+  totalAmount     Decimal         @db.Decimal(10, 2)
+  paidAmount      Decimal         @default(0) @db.Decimal(10, 2)
+  remainingAmount Decimal         @db.Decimal(10, 2)
+  status          BillingStatus
+  dueDate         DateTime
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  audit_logs      audit_logs[]
+  patients        patients        @relation(fields: [patientId], references: [id])
+  billing_items   billing_items[]
+
+  @@index([accountNumber])
+  @@index([patientId])
+  @@index([status])
+}
+
+model billing_items {
+  id               String           @id
+  billingAccountId String
+  patientId        String
+  procedureId      String?
+  description      String
+  quantity         Int              @default(1)
+  unitPrice        Decimal          @db.Decimal(10, 2)
+  totalPrice       Decimal          @db.Decimal(10, 2)
+  discount         Decimal          @default(0) @db.Decimal(10, 2)
+  status           BillingStatus
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  billing_accounts billing_accounts @relation(fields: [billingAccountId], references: [id])
+  patients         patients         @relation(fields: [patientId], references: [id])
+  procedures       procedures?      @relation(fields: [procedureId], references: [id])
+
+  @@index([billingAccountId])
+  @@index([patientId])
+  @@index([procedureId])
+}
+
+model business_rules {
+  id          String           @id
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime
+  name        String
+  description String?
+  code        String           @unique
+  type        BusinessRuleType
+  status      RuleStatus
+  priority    Int              @default(0)
+  conditions  Json
+  actions     Json
+  version     String           @default("1.0")
+  isActive    Boolean          @default(true)
+  tags        String[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([status])
+  @@index([type])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model contrato {
+  id          Int       @id @default(autoincrement())
+  numero      String    @unique @db.VarChar(255)
+  operadoraId String    @db.VarChar(255)
+  status      String    @db.VarChar(50)
+  dataInicio  DateTime  @db.Timestamp(6)
+  dataFim     DateTime  @db.Timestamp(6)
+  createdAt   DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([dataFim])
+  @@index([dataInicio])
+  @@index([numero])
+  @@index([operadoraId])
+  @@index([status])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model contrato_itens {
+  id                          String                        @id
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime
+  contratoId                  String
+  codigoTUSS                  String
+  descricao                   String?
+  valorContratado             Decimal                       @db.Decimal(10, 2)
+  estaNoPacote                Boolean                       @default(false)
+  requerAutorizacao           Boolean                       @default(false)
+  observacoes                 String?
+  tipoItem                    String?
+  valorMaximo                 Decimal?                      @db.Decimal(10, 2)
+  quantidadeMaxima            Int?
+  contratos                   contratos                     @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  contrato_materiais_inclusos contrato_materiais_inclusos[]
+
+  @@unique([contratoId, codigoTUSS], map: "contrato_itens_contratoId_codigoTUSS_idx")
+  @@unique([contratoId, codigoTUSS])
+  @@index([codigoTUSS])
+  @@index([contratoId])
+  @@index([tipoItem])
+}
+
+model contrato_materiais_inclusos {
+  id                String         @id
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime
+  contratoItemId    String
+  descricaoMaterial String         @db.VarChar(500)
+  quantidade        Int            @default(1)
+  obrigatorio       Boolean        @default(true)
+  contrato_itens    contrato_itens @relation(fields: [contratoItemId], references: [id], onDelete: Cascade)
+
+  @@index([contratoItemId])
+}
+
+model contratos {
+  id                  String           @id
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime
+  numero              String           @unique
+  operadoraId         String
+  dataInicio          DateTime
+  dataFim             DateTime?
+  valorMensal         Decimal?         @db.Decimal(12, 2)
+  status              ContratoStatus   @default(ATIVO)
+  tipoPagamento       String?
+  prazoMedioPagamento Int?
+  observacoes         String?
+  contrato_itens      contrato_itens[]
+  operadoras          operadoras       @relation(fields: [operadoraId], references: [id])
+
+  @@index([dataFim])
+  @@index([dataInicio])
+  @@index([operadoraId])
+  @@index([status])
+}
+
+model dialogues {
+  id         String   @id
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  patientId  String
+  title      String
+  content    String
+  type       String
+  isActive   Boolean  @default(true)
+  isResolved Boolean  @default(false)
+  metadata   Json?
+  tags       String[]
+  patients   patients @relation(fields: [patientId], references: [id])
+
+  @@index([isActive])
+  @@index([patientId])
+  @@index([type])
+}
+
+model documents {
+  id           String           @id
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime
+  title        String
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  category     DocumentCategory
+  subcategory  String?
+  tags         String[]
+  content      String?
+  summary      String?
+  patientId    String?
+  isProcessed  Boolean          @default(false)
+  isPublic     Boolean          @default(false)
+  patients     patients?        @relation(fields: [patientId], references: [id])
+
+  @@index([category])
+  @@index([createdAt])
+  @@index([patientId])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model dut_tuss_mapping {
+  id                   Int       @id @default(autoincrement())
+  dut_numero           Int
+  dut_titulo           String
+  codigo_tuss          String?   @db.VarChar(8)
+  descricao_tuss       String?
+  confianca_mapeamento String?   @db.VarChar(20)
+  similaridade         Decimal?  @db.Decimal(5, 4)
+  curadoria_manual     Boolean?  @default(false)
+  nota_curadoria       String?
+  created_at           DateTime? @default(now())
+  updated_at           DateTime? @default(now())
+
+  @@index([codigo_tuss], map: "idx_codigo_tuss")
+  @@index([confianca_mapeamento], map: "idx_confianca")
+  @@index([dut_numero], map: "idx_dut_numero")
+}
+
+model guia {
+  id                        Int                  @id @default(autoincrement())
+  numeroGuiaPrestador       String               @unique
+  numeroGuiaOperadora       String?
+  numeroCarteira            String?
+  senha                     String?
+  dataAutorizacao           DateTime?
+  dataValidadeSenha         DateTime?
+  atendimentoRN             String?
+  tipoTransacao             String?
+  loteGuia                  String?
+  caraterAtendimento        String?
+  tipoFaturamento           String?
+  dataInicioFaturamento     DateTime?
+  dataFinalFaturamento      DateTime?
+  tipoInternacao            String?
+  regimeInternacao          String?
+  diagnostico               String?
+  indicadorAcidente         String?
+  motivoEncerramento        String?
+  outrasDespesas            Json?
+  valorTotalProcedimentos   Float?
+  valorTotalDiarias         Float?
+  valorTotalTaxasAlugueis   Float?
+  valorTotalMateriais       Float?
+  valorTotalMedicamentos    Float?
+  valorTotalOPME            Float?
+  valorTotalGasesMedicinais Float?
+  valorTotalGeral           Float?
+  observacao                String?
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime
+  patientId                 String?
+  tipoGuia                  String?
+  patients                  patients?            @relation(fields: [patientId], references: [id])
+  guia_procedimentos        guia_procedimentos[]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model guia_procedimentos {
+  id                    Int     @id @default(autoincrement())
+  sequencialItem        String
+  dataExecucao          String?
+  horaInicial           String?
+  horaFinal             String?
+  codigoTabela          String?
+  codigoProcedimento    String?
+  descricaoProcedimento String?
+  quantidadeExecutada   Int?
+  viaAcesso             String?
+  tecnicaUtilizada      String?
+  reducaoAcrescimo      Float?
+  valorUnitario         Float?
+  valorTotal            Float?
+  nomeProfissional      String?
+  identEquipe           Json?
+  guiaId                Int
+  valorAprovado         Float?
+  motivoRejeicao        String?
+  categoriaRejeicao     String?
+  guia                  guia    @relation(fields: [guiaId], references: [id], onDelete: Cascade)
+
+  @@unique([guiaId, sequencialItem])
+}
+
+model hospital_systems {
+  id          String    @id
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  name        String
+  code        String    @unique
+  description String?
+  endpoint    String
+  apiKey      String?
+  config      Json
+  isActive    Boolean   @default(true)
+  isConnected Boolean   @default(false)
+  lastSync    DateTime?
+  version     String    @default("1.0")
+  tags        String[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model operadoras {
+  id           String      @id
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime
+  codigoANS    String      @unique
+  razaoSocial  String
+  nomeFantasia String?
+  cnpj         String      @unique
+  registroANS  String
+  modalidade   String
+  telefone     String?
+  email        String?
+  endereco     String?
+  isActive     Boolean     @default(true)
+  contratos    contratos[]
+
+  @@index([cnpj])
+  @@index([codigoANS])
+  @@index([isActive])
+}
+
+model patients {
+  id                   String              @id
   createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  updatedAt            DateTime
   deletedAt            DateTime?
   fullName             String
   birthDate            DateTime
@@ -21,39 +404,109 @@ model Patient {
   accommodationType    AccommodationType
   address              String?
   admissionDate        DateTime
-  cpf                  String?              @unique
+  cpf                  String?             @unique
   currentAccommodation AccommodationType
   gender               Gender
   insuranceNumber      String?
   insurancePlan        String?
   insuranceValidity    DateTime
-  medicalRecordNumber  String?              @unique
+  medicalRecordNumber  String?             @unique
   observations         String?
   responsibleDoctor    String?
   rg                   String?
   roomNumber           String?
   status               PatientStatus
   validationStatus     ValidationStatus
-  auditLogs            AuditLog[]
-  billingAccounts      BillingAccount[]
-  billingItems         BillingItem[]
-  dialogues            Dialogue[]
-  documents            Document[]
-  procedures           Procedure[]
-  guias                Guia[] 
+  audit_logs           audit_logs[]
+  billing_accounts     billing_accounts[]
+  billing_items        billing_items[]
+  dialogues            dialogues[]
+  documents            documents[]
+  guia                 guia[]
+  procedures           procedures[]
 
   @@index([cpf])
   @@index([medicalRecordNumber])
   @@index([roomNumber])
   @@index([status])
   @@index([validationStatus])
-  @@map("patients")
 }
 
-model Procedure {
-  id                        String          @id @default(cuid())
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model procedimento_auditoria_log {
+  id                      Int       @id @default(autoincrement())
+  created_at              DateTime? @default(now()) @db.Timestamp(6)
+  updated_at              DateTime? @default(now()) @db.Timestamp(6)
+  guia_id                 String    @db.VarChar(255)
+  guia_numero             String?   @db.VarChar(255)
+  procedimento_sequencial Int?
+  codigo_procedimento     String    @db.VarChar(50)
+  descricao_procedimento  String?
+  numero_carteira         String?   @db.VarChar(255)
+  operadora_registro_ans  String?   @db.VarChar(50)
+  operadora_nome          String?   @db.VarChar(255)
+  tipo_apontamento        String    @db.VarChar(100)
+  valor_original          Decimal   @db.Decimal(10, 2)
+  quantidade_original     Decimal?  @db.Decimal(10, 4)
+  valor_contratado        Decimal?  @db.Decimal(10, 2)
+  quantidade_maxima       Decimal?  @db.Decimal(10, 4)
+  valor_aprovado          Decimal?  @db.Decimal(10, 2)
+  quantidade_aprovada     Decimal?  @db.Decimal(10, 4)
+  economia_valor          Decimal?  @default(0) @db.Decimal(10, 2)
+  decisao                 String    @db.VarChar(50)
+  auditor_id              String?   @db.VarChar(255)
+  auditor_nome            String?   @db.VarChar(255)
+  auditor_observacoes     String?
+  data_decisao            DateTime? @default(now()) @db.Timestamp(6)
+  xml_entrada_hash        String?   @db.VarChar(64)
+
+  @@index([auditor_id], map: "idx_procedimento_auditoria_log_auditor")
+  @@index([codigo_procedimento], map: "idx_procedimento_auditoria_log_codigo")
+  @@index([data_decisao], map: "idx_procedimento_auditoria_log_data")
+  @@index([decisao], map: "idx_procedimento_auditoria_log_decisao")
+  @@index([guia_id], map: "idx_procedimento_auditoria_log_guia_id")
+  @@index([operadora_registro_ans], map: "idx_procedimento_auditoria_log_operadora")
+  @@index([tipo_apontamento], map: "idx_procedimento_auditoria_log_tipo")
+}
+
+model procedimento_dut {
+  id                    String    @id
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime
+  codigoTUSS            String    @unique
+  descricaoProcedimento String
+  temDUT                Boolean   @default(false)
+  descricaoDUT          String?
+  criteriosUtilizacao   String?
+  indicacoes            String?
+  contraindicacoes      String?
+  observacoes           String?
+  dataVigencia          DateTime?
+
+  @@index([codigoTUSS])
+  @@index([temDUT])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model procedimento_status {
+  id             Int                @id @default(autoincrement())
+  guiaId         Int
+  procedimentoId Int
+  status         StatusProcedimento
+  auditorId      String?            @db.VarChar(255)
+  observacoes    String?
+  createdAt      DateTime?          @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime?          @default(now()) @db.Timestamp(6)
+
+  @@unique([guiaId, procedimentoId], map: "procedimento_status_unique_idx")
+  @@index([guiaId])
+  @@index([status])
+}
+
+model procedures {
+  id                        String          @id
   createdAt                 DateTime        @default(now())
-  updatedAt                 DateTime        @updatedAt
+  updatedAt                 DateTime
   code                      String
   description               String?
   patientId                 String?
@@ -78,296 +531,14 @@ model Procedure {
   complications             String?
   notes                     String?
   deletedAt                 DateTime?       @db.Timestamp(6)
-  auditLogs                 AuditLog[]
-  billingItems              BillingItem[]
-  patient                   Patient?        @relation(fields: [patientId], references: [id])
-
-  @@index([code])
-  @@index([category])
-  @@index([status])
-  @@index([patientId])
-  @@map("procedures")
-}
-
-model BillingAccount {
-  id              String        @id @default(cuid())
-  patientId       String
-  accountNumber   String        @unique
-  totalAmount     Decimal       @db.Decimal(10, 2)
-  paidAmount      Decimal       @default(0) @db.Decimal(10, 2)
-  remainingAmount Decimal       @db.Decimal(10, 2)
-  status          BillingStatus
-  dueDate         DateTime
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  auditLogs       AuditLog[]
-  patient         Patient       @relation(fields: [patientId], references: [id])
-  billingItems    BillingItem[]
-
-  @@index([patientId])
-  @@index([accountNumber])
-  @@index([status])
-  @@map("billing_accounts")
-}
-
-model BillingItem {
-  id               String         @id @default(cuid())
-  billingAccountId String
-  patientId        String
-  procedureId      String?
-  description      String
-  quantity         Int            @default(1)
-  unitPrice        Decimal        @db.Decimal(10, 2)
-  totalPrice       Decimal        @db.Decimal(10, 2)
-  discount         Decimal        @default(0) @db.Decimal(10, 2)
-  status           BillingStatus
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  billingAccount   BillingAccount @relation(fields: [billingAccountId], references: [id])
-  patient          Patient        @relation(fields: [patientId], references: [id])
-  procedure        Procedure?     @relation(fields: [procedureId], references: [id])
-
-  @@index([billingAccountId])
-  @@index([patientId])
-  @@index([procedureId])
-  @@map("billing_items")
-}
-
-model AuditLog {
-  id               String          @id @default(cuid())
-  createdAt        DateTime        @default(now())
-  entityId         String
-  userId           String
-  userName         String
-  userRole         String
-  patientId        String?
-  procedureId      String?
-  newValues        Json?
-  oldValues        Json?
-  billingAccountId String?
-  changes          Json?
-  ipAddress        String?
-  sessionId        String?
-  userAgent        String?
-  entity           AuditLogEntity
-  action           AuditLogAction
-  billingAccount   BillingAccount? @relation(fields: [billingAccountId], references: [id])
-  patient          Patient?        @relation(fields: [patientId], references: [id])
-  procedure        Procedure?      @relation(fields: [procedureId], references: [id])
-
-  @@index([action])
-  @@index([entity])
-  @@index([entityId])
-  @@index([userId])
-  @@index([createdAt])
-  @@index([patientId])
-  @@map("audit_logs")
-}
-
-model Document {
-  id           String           @id @default(cuid())
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  title        String
-  filename     String
-  originalName String
-  mimeType     String
-  size         Int
-  category     DocumentCategory
-  subcategory  String?
-  tags         String[]
-  content      String?
-  summary      String?
-  patientId    String?
-  isProcessed  Boolean          @default(false)
-  isPublic     Boolean          @default(false)
-  patient      Patient?         @relation(fields: [patientId], references: [id])
+  audit_logs                audit_logs[]
+  billing_items             billing_items[]
+  patients                  patients?       @relation(fields: [patientId], references: [id])
 
   @@index([category])
-  @@index([patientId])
-  @@index([createdAt])
-  @@map("documents")
-}
-
-model BusinessRule {
-  id          String           @id @default(cuid())
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  name        String
-  description String?
-  code        String           @unique
-  type        BusinessRuleType
-  status      RuleStatus
-  priority    Int              @default(0)
-  conditions  Json
-  actions     Json
-  version     String           @default("1.0")
-  isActive    Boolean          @default(true)
-  tags        String[]
-
   @@index([code])
-  @@index([type])
+  @@index([patientId])
   @@index([status])
-  @@index([isActive])
-  @@map("business_rules")
-}
-
-model Dialogue {
-  id         String   @id @default(cuid())
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  patientId  String
-  title      String
-  content    String
-  type       String
-  isActive   Boolean  @default(true)
-  isResolved Boolean  @default(false)
-  metadata   Json?
-  tags       String[]
-  patient    Patient  @relation(fields: [patientId], references: [id])
-
-  @@index([patientId])
-  @@index([type])
-  @@index([isActive])
-  @@map("dialogues")
-}
-
-model AIAgent {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  name        String
-  description String?
-  type        String
-  config      Json
-  model       String
-  version     String   @default("1.0")
-  isActive    Boolean  @default(true)
-  isTraining  Boolean  @default(false)
-  tags        String[]
-
-  @@index([type])
-  @@index([isActive])
-  @@map("ai_agents")
-}
-
-model HospitalSystem {
-  id          String    @id @default(cuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  name        String
-  code        String    @unique
-  description String?
-  endpoint    String
-  apiKey      String?
-  config      Json
-  isActive    Boolean   @default(true)
-  isConnected Boolean   @default(false)
-  lastSync    DateTime?
-  version     String    @default("1.0")
-  tags        String[]
-
-  @@index([code])
-  @@index([isActive])
-  @@map("hospital_systems")
-}
-
-model Guia {
-  id                        Int            @id @default(autoincrement())
-  numeroGuiaPrestador       String         @unique
-  numeroGuiaOperadora       String?
-  numeroCarteira            String?
-  senha                     String?
-  dataAutorizacao           DateTime?
-  dataValidadeSenha         DateTime?
-  atendimentoRN             String?
-  tipoTransacao             String?
-  tipoGuia                  String?
-  loteGuia                  String?
-  caraterAtendimento        String?
-  tipoFaturamento           String?
-  dataInicioFaturamento     DateTime?
-  dataFinalFaturamento      DateTime?
-  tipoInternacao            String?
-  regimeInternacao          String?
-  diagnostico               String?
-  indicadorAcidente         String?
-  motivoEncerramento        String?
-  outrasDespesas            Json?
-  valorTotalProcedimentos   Float?
-  valorTotalDiarias         Float?
-  valorTotalTaxasAlugueis   Float?
-  valorTotalMateriais       Float?
-  valorTotalMedicamentos    Float?
-  valorTotalOPME            Float?
-  valorTotalGasesMedicinais Float?
-  valorTotalGeral           Float?
-  observacao                String?
-  createdAt                 DateTime       @default(now())
-  updatedAt                 DateTime       @updatedAt
-  patientId                 String?
-  patient                   Patient? @relation(fields: [patientId], references: [id])
-  procedimentos             Procedimento[]
-
-  @@map("guia")
-}
-
-model Procedimento {
-  id                    Int                   @id @default(autoincrement())
-  sequencialItem        String
-  dataExecucao          String?
-  horaInicial           String?
-  horaFinal             String?
-  codigoTabela          String?
-  codigoProcedimento    String?
-  descricaoProcedimento String?
-  quantidadeExecutada   Int?
-  viaAcesso             String?
-  tecnicaUtilizada      String?
-  reducaoAcrescimo      Float?
-  valorUnitario         Float?
-  valorTotal            Float?
-  nomeProfissional      String?
-  identEquipe           Json?
-  guiaId                Int
-  guia                  Guia                  @relation(fields: [guiaId], references: [id], onDelete: Cascade)
-  auditStatus           ProcedimentoStatus?   @relation("ProcedimentoToStatus")
-  @@unique([guiaId, sequencialItem])
-  @@map("guia_procedimentos")
-}
-
-model ProcedimentoStatus {
-  id              Int          @id @default(autoincrement())
-  guiaId          Int
-  procedimentoId  Int          @unique
-  status          String       // PENDENTE, APROVADO, REJEITADO
-  auditorId       String
-  observacoes     String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  procedimento    Procedimento @relation("ProcedimentoToStatus", fields: [procedimentoId], references: [id], onDelete: Cascade)
-  @@map("procedimento_status")
-}
-
-model tussProcedimento {
-  codigoTUSS         String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  itemSIP            String
-  observacaoTuss     String?
-
-  @@map("tussProcedimentos")
-}
-
-model tbdomTipoInternacao {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomTipoInternacao")
 }
 
 model tbdomAusenciaCodValidacao {
@@ -376,129 +547,6 @@ model tbdomAusenciaCodValidacao {
   dataInicioVigencia DateTime? @db.Date
   dataFimVigencia    DateTime? @db.Date
   dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomAusenciaCodValidacao")
-}
-
-model tbdomIdentificaBeneficiario {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomIdentificaBeneficiario")
-}
-
-model tbdomCaraterAtendimento {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomCaraterAtendimento")
-}
-
-model tbdomTipoFaturamento {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomTipoFaturamento")
-}
-
-model tbdomRegimeInternacao {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomRegimeInternacao")
-}
-
-model tbdomIndicadorAcidente {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomIndicadorAcidente")
-}
-
-model tbdomMotivoEncerramento {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomMotivoEncerramento")
-}
-
-model tbdomRelacaoTUSS {
-  codigoTabela       String    @id @db.VarChar(10)
-  descricao          String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomRelacaoTUSS")
-}
-
-model tbdomViaAcesso {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomViaAcesso")
-}
-
-model tbdomTecnicaUtilizada {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomTecnicaUtilizada")
-}
-
-model tbdomGrauParticipacao {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomGrauParticipacao")
-}
-
-model tbdomConselhoProfissional {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomConselhoProfissional")
-}
-
-model tbdomUF {
-  codigoTermo        String    @id @db.VarChar(10)
-  termo              String    @db.VarChar(500)
-  sigla              String    @db.VarChar(10)
-  dataInicioVigencia DateTime? @db.Date
-  dataFimVigencia    DateTime? @db.Date
-  dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomUF")
 }
 
 model tbdomCBO {
@@ -507,8 +555,14 @@ model tbdomCBO {
   dataInicioVigencia DateTime? @db.Date
   dataFimVigencia    DateTime? @db.Date
   dataFimImplantacao DateTime? @db.Date
+}
 
-  @@map("tbdomCBO")
+model tbdomCaraterAtendimento {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
 }
 
 model tbdomCodigoDespesa {
@@ -517,21 +571,49 @@ model tbdomCodigoDespesa {
   dataInicioVigencia DateTime? @db.Date
   dataFimVigencia    DateTime? @db.Date
   dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomCodigoDespesa")
 }
 
-model tbdomUnMedida {
+model tbdomConselhoProfissional {
   codigoTermo        String    @id @db.VarChar(10)
   termo              String    @db.VarChar(500)
-  descricaoDetalhada String    @db.VarChar(500)
   dataInicioVigencia DateTime? @db.Date
   dataFimVigencia    DateTime? @db.Date
   dataFimImplantacao DateTime? @db.Date
-
-  @@map("tbdomUnMedida")
 }
 
+model tbdomGrauParticipacao {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+model tbdomIdentificaBeneficiario {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+model tbdomIndicadorAcidente {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+model tbdomMotivoEncerramento {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tbdomPorte {
   codigo             String    @id @db.VarChar(10)
   procedimento       String    @db.VarChar(500)
@@ -551,30 +633,79 @@ model tbdomPorte {
   @@index([porte])
 }
 
-enum Gender {
-  MALE
-  FEMALE
-  OTHER
+model tbdomRegimeInternacao {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
 }
 
-enum PatientStatus {
-  ACTIVE
-  INACTIVE
-  DISCHARGED
-  TRANSFERRED
+model tbdomRelacaoTUSS {
+  codigoTabela       String    @id @db.VarChar(10)
+  descricao          String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
 }
 
-enum ValidationStatus {
-  PENDING
-  VALIDATED
-  REJECTED
+model tbdomTecnicaUtilizada {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
 }
 
-enum AccommodationType {
-  STANDARD
-  PREMIUM
-  VIP
-  ICU
+model tbdomTipoFaturamento {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+model tbdomTipoInternacao {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+model tbdomUF {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  sigla              String    @db.VarChar(10)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+model tbdomUnMedida {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  descricaoDetalhada String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+model tbdomViaAcesso {
+  codigoTermo        String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+}
+
+model tussProcedimentos {
+  codigoTUSS         String    @id @db.VarChar(10)
+  termo              String    @db.VarChar(500)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  itemSIP            String
+  observacaoTuss     String?
 }
 
 enum AccommodationStatus {
@@ -584,18 +715,19 @@ enum AccommodationStatus {
   RESERVED
 }
 
-enum ProcedureStatus {
-  SCHEDULED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
+enum AccommodationType {
+  STANDARD
+  PREMIUM
+  VIP
+  ICU
 }
 
-enum BillingStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  PAID
+enum AnesthesiaType {
+  LOCAL
+  REGIONAL
+  GENERAL
+  SEDATION
+  NONE
 }
 
 enum AuditLogAction {
@@ -615,13 +747,11 @@ enum AuditLogEntity {
   USER
 }
 
-enum DocumentCategory {
-  MEDICAL_RECORD
-  INSURANCE
-  IDENTIFICATION
-  PROCEDURE_REPORT
-  BILLING_DOCUMENT
-  OTHER
+enum BillingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
 }
 
 enum BusinessRuleType {
@@ -631,18 +761,26 @@ enum BusinessRuleType {
   NOTIFICATION
 }
 
-enum RuleStatus {
-  ACTIVE
-  INACTIVE
-  DRAFT
+enum ContratoStatus {
+  ATIVO
+  INATIVO
+  VENCIDO
+  SUSPENSO
 }
 
-enum AnesthesiaType {
-  LOCAL
-  REGIONAL
-  GENERAL
-  SEDATION
-  NONE
+enum DocumentCategory {
+  MEDICAL_RECORD
+  INSURANCE
+  IDENTIFICATION
+  PROCEDURE_REPORT
+  BILLING_DOCUMENT
+  OTHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
 }
 
 enum MaterialRequestStatus {
@@ -669,6 +807,13 @@ enum MaterialUrgency {
   MEDIUM
   HIGH
   URGENT
+}
+
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+  DISCHARGED
+  TRANSFERRED
 }
 
 enum ProcedureCategory {
@@ -701,6 +846,35 @@ enum ProcedureComplexity {
   PORTE_ESPECIAL
 }
 
+enum ProcedureStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RuleStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+enum StatusProcedimento {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  EM_ANALISE
+}
+
+enum StatusValidacao {
+  CONFORME
+  NAO_CONFORME
+  ALERTA
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
 enum SurgicalRole {
   MAIN_SURGEON
   ASSISTANT_SURGEON
@@ -708,4 +882,18 @@ enum SurgicalRole {
   NURSE
   TECHNICIAN
   RESIDENT
+}
+
+enum TipoValidacao {
+  PORTE_CIRURGICO
+  DUT
+  PACOTE_CONTRATUAL
+  VALOR_CONTRATUAL
+  DUPLICIDADE
+}
+
+enum ValidationStatus {
+  PENDING
+  VALIDATED
+  REJECTED
 }

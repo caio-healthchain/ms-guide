@@ -239,7 +239,7 @@ export class GuideService {
       const logEntry = {
         guiaId: procedimento.guiaId?.toString() || '',
         guiaNumero: procedimento.numeroGuiaPrestador,
-        procedimentoSequencial: procedimento.sequencialItem,
+        procedimentoSequencial: parseInt(procedimento.sequencialItem) || null,
         codigoProcedimento: procedimento.codigoProcedimento,
         descricaoProcedimento: procedimento.descricaoProcedimento,
         tipoApontamento: categoriaRejeicao || 'VALOR_DIVERGENTE',
