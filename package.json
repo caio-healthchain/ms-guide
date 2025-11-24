@@ -15,10 +15,13 @@
     "clean": "rm -rf dist",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "mcp": "ts-node src/mcp/start-mcp.ts",
+    "mcp:build": "tsc && node dist/mcp/start-mcp.js"
   },
   "dependencies": {
     "@azure/service-bus": "^7.9.5",
+    "@modelcontextprotocol/sdk": "^1.22.0",
     "@prisma/client": "^6.19.0",
     "compression": "^1.7.4",
     "cors": "^2.8.5",

@@ -16,6 +16,7 @@ import { requestLogger } from './middleware/request-logger';
 // Routes
 import guideRoutes from './routes/guide.routes';
 import healthRoutes from './routes/health.routes';
+import analyticsRoutes from './routes/analytics.routes';
 
 class GuideService {
   private app: express.Application;
@@ -84,6 +85,9 @@ class GuideService {
     // Guide routes (API Key required)
     this.app.use('/api/v1/guides', guideRoutes);
 
+    // Analytics routes (API Key required)
+    this.app.use('/api/v1/analytics', analyticsRoutes);
+
     // Root endpoint
     this.app.get('/', (_req, res) => {
       res.json({
@@ -145,6 +149,10 @@ class GuideService {
           {
             name: 'Guides',
             description: 'Guide management endpoints',
+          },
+          {
+            name: 'Analytics',
+            description: 'Analytics and reporting endpoints',
           },
         ],
       },
