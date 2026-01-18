@@ -92,6 +92,14 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: 'get_guides_history',
+    description: 'Retorna histórico completo de todas as guias (passado e presente) com status e valores',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
 ];
 
 /**
@@ -145,6 +153,9 @@ class GuidesMCPServer {
 
           case 'get_guides_revenue':
             return await this.handleGetRevenue(args);
+
+          case 'get_guides_history':
+            return await this.handleGetGuideHistory(args);
 
           default:
             throw new Error(`Tool desconhecida: ${name}`);
@@ -229,6 +240,20 @@ class GuidesMCPServer {
         {
           type: 'text',
           text: JSON.stringify(revenue, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleGetGuideHistory(args: any) {
+    const hospitalId = args?.hospitalId || 'hosp_sagrada_familia_001';
+    const history = await analyticsService.getGuideHistory(hospitalId);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(history, null, 2),
         },
       ],
     };

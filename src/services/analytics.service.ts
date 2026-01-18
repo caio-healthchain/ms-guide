@@ -377,6 +377,85 @@ export class AnalyticsService {
   }
 
   /**
+   * Retorna histórico de todas as guias (passado e presente)
+   */
+  async getGuideHistory(hospitalId?: string): Promise<any> {
+    try {
+      const hId = hospitalId || 'hosp_sagrada_familia_001';
+
+      // Buscar todas as guias
+      const guias = await prisma.guia.findMany({
+        where: {
+          hospitalId: hId
+        },
+        select: {
+          id: true,
+          numeroGuiaPrestador: true,
+          numeroGuiaOperadora: true,
+          numeroCarteira: true,
+          dataAutorizacao: true,
+          valorTotalGeral: true,
+          tipoFaturamento: true,
+          dataFinalFaturamento: true,
+          motivoEncerramento: true,
+          createdAt: true
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      // Calcular estatísticas
+      let total_finalizadas = 0;
+      let total_em_andamento = 0;
+      let total_canceladas = 0;
+      let valor_total = 0;
+
+      const guidesList: GuideInfo[] = guias.map(guia => {
+        // Determinar status
+        let status = 'EM_ANDAMENTO';
+        if (guia.motivoEncerramento) {
+          status = 'CANCELADA';
+          total_canceladas++;
+        } else if (guia.dataFinalFaturamento) {
+          status = 'FINALIZADA';
+          total_finalizadas++;
+        } else {
+          total_em_andamento++;
+        }
+
+        valor_total += guia.valorTotalGeral || 0;
+
+        return {
+          id: guia.id,
+          numeroGuiaPrestador: guia.numeroGuiaPrestador,
+          numeroGuiaOperadora: guia.numeroGuiaOperadora,
+          numeroCarteira: guia.numeroCarteira,
+          dataAutorizacao: guia.dataAutorizacao,
+          valorTotalGeral: guia.valorTotalGeral,
+          tipoFaturamento: guia.tipoFaturamento,
+          status
+        };
+      });
+
+      const valor_medio = guias.length > 0 ? valor_total / guias.length : 0;
+
+      return {
+        total_guias: guias.length,
+        guias_finalizadas: total_finalizadas,
+        guias_em_andamento: total_em_andamento,
+        guias_canceladas: total_canceladas,
+        valor_total: Number(valor_total.toFixed(2)),
+        valor_medio: Number(valor_medio.toFixed(2)),
+        guias: guidesList
+      };
+    } catch (error) {
+      logger.error('[Analytics] Erro ao buscar histórico de guias:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Helper para calcular datas do período
    */
   private getPeriodDates(period: string, date: Date): { startDate: Date; endDate: Date } {
