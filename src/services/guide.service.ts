@@ -19,6 +19,7 @@ export class GuideService {
     page?: number;
     search?: string;
     tipoGuia?: string;
+    hospitalId?: string;
   }): Promise<PaginatedResponse<any>> {
     try {
       const limit = Math.min(params.limit || 100, 100);
@@ -30,6 +31,7 @@ export class GuideService {
         offset,
         search: params.search,
         tipoGuia: params.tipoGuia,
+        hospitalId: params.hospitalId || 'hosp_sagrada_familia_001',
       });
 
       return {
@@ -122,11 +124,11 @@ export class GuideService {
   /**
    * Retorna estatísticas das guias
    */
-  async getGuideStats(): Promise<any> {
+  async getGuideStats(hospitalId: string = 'hosp_sagrada_familia_001'): Promise<any> {
     try {
       const [countByType, totalValue] = await Promise.all([
-        this.guideRepository.countByTipoGuia(),
-        this.guideRepository.getTotalValue(),
+        this.guideRepository.countByTipoGuia(hospitalId),
+        this.guideRepository.getTotalValue(hospitalId),
       ]);
 
       return {

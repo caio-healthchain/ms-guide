@@ -319,8 +319,11 @@ model guia {
   updatedAt                 DateTime
   patientId                 String?
   tipoGuia                  String?
+  hospitalId                String               @default("hosp_sagrada_familia_001")
   patients                  patients?            @relation(fields: [patientId], references: [id])
   guia_procedimentos        guia_procedimentos[]
+
+  @@index([hospitalId])
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments

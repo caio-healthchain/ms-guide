@@ -22,6 +22,7 @@ export class GuideController {
     const page = parseInt((req.query.page as string) || '1', 10);
     const search = req.query.search as string;
     const tipoGuia = req.query.tipoGuia as string;
+    const hospitalId = (req.query.hospitalId as string) || 'hosp_sagrada_familia_001';
 
     const result = await this.guideService.getAllGuides({
       limit,
@@ -29,6 +30,7 @@ export class GuideController {
       page,
       search,
       tipoGuia,
+      hospitalId,
     });
 
     res.json({
@@ -109,9 +111,10 @@ export class GuideController {
    * GET /api/v1/guides/stats
    * Retorna estatísticas das guias
    */
-  getGuideStats = asyncHandler(async (_req: Request, res: Response) => {
+  getGuideStats = asyncHandler(async (req: Request, res: Response) => {
     logger.info('Getting guide statistics');
-    const stats = await this.guideService.getGuideStats();
+    const hospitalId = (req.query.hospitalId as string) || 'hosp_sagrada_familia_001';
+    const stats = await this.guideService.getGuideStats(hospitalId);
 
     res.json({
       success: true,

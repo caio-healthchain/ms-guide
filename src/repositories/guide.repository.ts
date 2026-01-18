@@ -10,11 +10,12 @@ export class GuideRepository {
     offset?: number;
     search?: string;
     tipoGuia?: string;
+    hospitalId?: string;
   }): Promise<{ data: any[]; total: number }> {
     try {
-      const { limit = 100, offset = 0, search, tipoGuia } = params;
+      const { limit = 100, offset = 0, search, tipoGuia, hospitalId = 'hosp_sagrada_familia_001' } = params;
 
-      const where: any = {};
+      const where: any = { hospitalId };
 
       // Filtro por tipo de guia
       if (tipoGuia) {
@@ -218,10 +219,11 @@ export class GuideRepository {
   /**
    * Conta guias por tipo
    */
-  async countByTipoGuia(): Promise<{ [key: string]: number }> {
+  async countByTipoGuia(hospitalId: string = 'hosp_sagrada_familia_001'): Promise<{ [key: string]: number }> {
     try {
       const result = await prisma.guia.groupBy({
         by: ['tipoGuia'],
+        where: { hospitalId },
         _count: true,
       });
 
@@ -242,9 +244,10 @@ export class GuideRepository {
   /**
    * Calcula valor total de todas as guias
    */
-  async getTotalValue(): Promise<number> {
+  async getTotalValue(hospitalId: string = 'hosp_sagrada_familia_001'): Promise<number> {
     try {
       const result = await prisma.guia.aggregate({
+        where: { hospitalId },
         _sum: {
           valorTotalProcedimentos: true,
         },
