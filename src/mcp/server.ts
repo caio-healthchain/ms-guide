@@ -166,7 +166,8 @@ class GuidesMCPServer {
 
   private async handleGetDailySummary(args: any) {
     const date = args?.date ? new Date(args.date) : new Date();
-    const summary = await analyticsService.getDailySummary(date);
+    const hospitalId = args?.hospitalId || 'hosp_sagrada_familia_001';
+    const summary = await analyticsService.getDailySummary(date, hospitalId);
 
     return {
       content: [
@@ -185,8 +186,9 @@ class GuidesMCPServer {
 
     const date = args.date ? new Date(args.date) : new Date();
     const limit = args.limit || 100;
+    const hospitalId = args?.hospitalId || 'hosp_sagrada_familia_001';
 
-    const guides = await analyticsService.getGuidesByStatus(args.status, date, limit);
+    const guides = await analyticsService.getGuidesByStatus(args.status, date, limit, hospitalId);
 
     return {
       content: [
@@ -201,8 +203,9 @@ class GuidesMCPServer {
   private async handleGetStatistics(args: any) {
     const period = args?.period || 'day';
     const date = args?.date ? new Date(args.date) : new Date();
+    const hospitalId = args?.hospitalId || 'hosp_sagrada_familia_001';
 
-    const stats = await analyticsService.getStatistics(period, date);
+    const stats = await analyticsService.getStatistics(period, date, hospitalId);
 
     return {
       content: [
@@ -217,8 +220,9 @@ class GuidesMCPServer {
   private async handleGetRevenue(args: any) {
     const period = args?.period || 'day';
     const date = args?.date ? new Date(args.date) : new Date();
+    const hospitalId = args?.hospitalId || 'hosp_sagrada_familia_001';
 
-    const revenue = await analyticsService.getRevenue(period, date);
+    const revenue = await analyticsService.getRevenue(period, date, hospitalId);
 
     return {
       content: [

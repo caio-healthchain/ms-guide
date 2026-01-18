@@ -50,11 +50,14 @@ export interface Revenue {
 }
 
 export class AnalyticsService {
+  private hospitalId: string = 'hosp_sagrada_familia_001';
+
   /**
    * Retorna resumo diário de guias
    */
-  async getDailySummary(date: Date): Promise<DailySummary> {
+  async getDailySummary(date: Date, hospitalId?: string): Promise<DailySummary> {
     try {
+      const hId = hospitalId || this.hospitalId;
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
 
@@ -64,6 +67,7 @@ export class AnalyticsService {
       // Total de guias do dia
       const total = await prisma.guia.count({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startOfDay,
             lte: endOfDay
@@ -71,22 +75,25 @@ export class AnalyticsService {
         }
       });
 
-      // Guias finalizadas (com data de finalização)
+      // Guias finalizadas (com data de finalização E SEM motivo de encerramento)
       const finalizadas = await prisma.guia.count({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startOfDay,
             lte: endOfDay
           },
           dataFinalFaturamento: {
             not: null
-          }
+          },
+          motivoEncerramento: null
         }
       });
 
       // Guias em andamento (sem data de finalização)
       const em_andamento = await prisma.guia.count({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startOfDay,
             lte: endOfDay
@@ -96,9 +103,10 @@ export class AnalyticsService {
         }
       });
 
-      // Guias canceladas (com motivo de encerramento)
+      // Guias canceladas (com motivo de encerramento, independente de ter data)
       const canceladas = await prisma.guia.count({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startOfDay,
             lte: endOfDay
@@ -112,6 +120,7 @@ export class AnalyticsService {
       // Valor total das guias do dia
       const valorAggregate = await prisma.guia.aggregate({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startOfDay,
             lte: endOfDay
@@ -125,7 +134,7 @@ export class AnalyticsService {
       const valor_total = valorAggregate._sum.valorTotalGeral || 0;
       const valor_medio = total > 0 ? valor_total / total : 0;
 
-      logger.info(`[Analytics] Resumo diário: ${total} guias, ${finalizadas} finalizadas`);
+      logger.info(`[Analytics] Resumo diário: ${total} guias, ${finalizadas} finalizadas, ${canceladas} canceladas`);
 
       return {
         total,
@@ -144,8 +153,9 @@ export class AnalyticsService {
   /**
    * Lista guias por status
    */
-  async getGuidesByStatus(status: string, date: Date, limit: number): Promise<GuideInfo[]> {
+  async getGuidesByStatus(status: string, date: Date, limit: number, hospitalId?: string): Promise<GuideInfo[]> {
     try {
+      const hId = hospitalId || this.hospitalId;
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
 
@@ -153,6 +163,7 @@ export class AnalyticsService {
       endOfDay.setHours(23, 59, 59, 999);
 
       let whereClause: any = {
+        hospitalId: hId,
         createdAt: {
           gte: startOfDay,
           lte: endOfDay
@@ -162,13 +173,17 @@ export class AnalyticsService {
       // Filtro por status
       switch (status.toUpperCase()) {
         case 'FINALIZADA':
+          // Finalizada: tem data de finalização E NÃO tem motivo de encerramento
           whereClause.dataFinalFaturamento = { not: null };
+          whereClause.motivoEncerramento = null;
           break;
         case 'EM_ANDAMENTO':
+          // Em andamento: NÃO tem data de finalização E NÃO tem motivo de encerramento
           whereClause.dataFinalFaturamento = null;
           whereClause.motivoEncerramento = null;
           break;
         case 'CANCELADA':
+          // Cancelada: tem motivo de encerramento (independente de ter data)
           whereClause.motivoEncerramento = { not: null };
           break;
         default:
@@ -205,12 +220,14 @@ export class AnalyticsService {
   /**
    * Retorna estatísticas gerais
    */
-  async getStatistics(period: string, date: Date): Promise<Statistics> {
+  async getStatistics(period: string, date: Date, hospitalId?: string): Promise<Statistics> {
     try {
+      const hId = hospitalId || this.hospitalId;
       const { startDate, endDate } = this.getPeriodDates(period, date);
 
       const total_guias = await prisma.guia.count({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startDate,
             lte: endDate
@@ -220,16 +237,19 @@ export class AnalyticsService {
 
       const guias_finalizadas = await prisma.guia.count({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startDate,
             lte: endDate
           },
-          dataFinalFaturamento: { not: null }
+          dataFinalFaturamento: { not: null },
+          motivoEncerramento: null
         }
       });
 
       const guias_em_andamento = await prisma.guia.count({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startDate,
             lte: endDate
@@ -241,6 +261,7 @@ export class AnalyticsService {
 
       const guias_canceladas = await prisma.guia.count({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startDate,
             lte: endDate
@@ -251,6 +272,7 @@ export class AnalyticsService {
 
       const valorAggregate = await prisma.guia.aggregate({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startDate,
             lte: endDate
@@ -264,6 +286,7 @@ export class AnalyticsService {
       const procedimentosCount = await prisma.guia_procedimentos.count({
         where: {
           guia: {
+            hospitalId: hId,
             createdAt: {
               gte: startDate,
               lte: endDate
@@ -273,7 +296,7 @@ export class AnalyticsService {
       });
 
       const valor_total = Number(valorAggregate._sum.valorTotalGeral || 0);
-      const taxa_finalizacao = total_guias > 0 ? (guias_finalizadas / total_guias) * 100 : 0;
+      const taxa_finalizacao = total_guias > 0 ? ((guias_finalizadas + guias_canceladas) / total_guias) * 100 : 0;
       const valor_medio_guia = total_guias > 0 ? valor_total / total_guias : 0;
       const procedimentos_por_guia = total_guias > 0 ? procedimentosCount / total_guias : 0;
 
@@ -297,17 +320,20 @@ export class AnalyticsService {
   /**
    * Retorna receita do período
    */
-  async getRevenue(period: string, date: Date): Promise<Revenue> {
+  async getRevenue(period: string, date: Date, hospitalId?: string): Promise<Revenue> {
     try {
+      const hId = hospitalId || this.hospitalId;
       const { startDate, endDate } = this.getPeriodDates(period, date);
 
       const guias = await prisma.guia.findMany({
         where: {
+          hospitalId: hId,
           createdAt: {
             gte: startDate,
             lte: endDate
           },
-          dataFinalFaturamento: { not: null }
+          dataFinalFaturamento: { not: null },
+          motivoEncerramento: null
         },
         select: {
           valorTotalGeral: true,
