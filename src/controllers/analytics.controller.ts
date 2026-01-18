@@ -140,4 +140,21 @@ export class AnalyticsController {
       });
     }
   }
+
+  async getGuideHistory(_req: Request, res: Response): Promise<void> {
+    try {
+      logger.info('[Analytics] Buscando histórico completo de guias');
+      const history = await this.analyticsService.getGuideHistory();
+      res.json({
+        success: true,
+        data: history
+      });
+    } catch (error) {
+      logger.error('[Analytics] Erro ao buscar histórico de guias:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erro ao buscar histórico de guias'
+      });
+    }
+  }
 }

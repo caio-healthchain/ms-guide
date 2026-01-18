@@ -130,4 +130,44 @@ router.get('/guides/revenue', (req, res) =>
   analyticsController.getRevenue(req, res)
 );
 
+/**
+ * @swagger
+ * /api/v1/analytics/guides/history:
+ *   get:
+ *     summary: Retorna histórico completo de todas as guias
+ *     tags: [Analytics]
+ *     responses:
+ *       200:
+ *         description: Histórico completo de guias
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: number
+ *                     finalizadas:
+ *                       type: number
+ *                     em_andamento:
+ *                       type: number
+ *                     canceladas:
+ *                       type: number
+ *                     valor_total:
+ *                       type: number
+ *                     valor_medio:
+ *                       type: number
+ *                     guias:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ */
+router.get('/guides/history', (req, res) => 
+  analyticsController.getGuideHistory(req, res)
+);
+
 export default router;
